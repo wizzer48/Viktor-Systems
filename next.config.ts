@@ -1,12 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactCompiler: true,
-  serverExternalPackages: ['puppeteer', 'puppeteer-core'],
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '10mb',
-    },
+  /* config options here */
+  serverExternalPackages: ['puppeteer-extra', 'puppeteer-extra-plugin-stealth', 'puppeteer'],
+  api: {
+    bodySizeLimit: '10mb',
   },
 };
 
