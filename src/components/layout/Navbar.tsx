@@ -1,99 +1,97 @@
-'use client';
+"use client"
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import { Menu, X, Terminal } from 'lucide-react';
-import { useState } from 'react';
-import { ModeToggle } from '@/components/mode-toggle';
+import * as React from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Menu, X, ShoppingCart } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { ModeToggle } from "@/components/mode-toggle"
+import { useQuote } from "@/context/QuoteContext"
+
+const navLinks = [
+    { name: "Ana Sayfa", href: "/" },
+    { name: "Kurumsal", href: "/kurumsal" },
+    { name: "Çözümler", href: "/cozumler" },
+    { name: "Ürünler", href: "/urunler" },
+    { name: "Referanslar", href: "/referanslar" },
+    { name: "İletişim", href: "/iletisim" },
+]
 
 export function Navbar() {
-    const pathname = usePathname();
-    const [isOpen, setIsOpen] = useState(false);
+    const pathname = usePathname()
+    const [isMenuOpen, setIsMenuOpen] = React.useState(false)
+    const { items } = useQuote()
 
-    // Hide public navbar on admin and login pages
-    if (pathname.startsWith('/admin') || pathname.startsWith('/login')) return null;
-
-    const links = [
-        { href: '/', label: 'ANA SAYFA' },
-        { href: '/kurumsal', label: 'KURUMSAL' },
-        { href: '/cozumler', label: 'ÇÖZÜMLER' },
-        { href: '/referanslar', label: 'REFERANSLAR' },
-        { href: '/iletisim', label: 'İLETİŞİM' },
-    ];
+    const itemCount = items.length
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--viktor-bg)]/80 backdrop-blur-md border-b border-[var(--viktor-border)]">
-            <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-                {/* Logo */}
-                <Link
-                    href="/"
-                    className="flex items-center gap-2 group relative z-50"
-                    onClick={() => setIsOpen(false)}
-                >
-                    <div className="w-10 h-10 bg-[var(--viktor-blue)] rounded-sm flex items-center justify-center text-black font-bold shadow-[0_0_15px_rgba(0,180,216,0.5)] group-hover:shadow-[0_0_25px_rgba(0,180,216,0.8)] transition-shadow duration-300">
-                        <Terminal className="w-6 h-6" />
+        <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backface-filter]:bg-background/60">
+            <div className="container flex h-16 items-center justify-between">
+                <div className="flex items-center gap-8">
+                    <Link href="/" className="flex items-center space-x-2">
+                        <span className="text-2xl font-bold tracking-tighter text-primary">VIKTOR</span>
+                    </Link>
+                    <div className="hidden md:flex gap-6">
+                        {navLinks.map((link) => (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className={cn(
+                                    "text-sm font-medium transition-colors hover:text-primary",
+                                    pathname === link.href ? "text-foreground" : "text-muted-foreground"
+                                )}
+                            >
+                                {link.name}
+                            </Link>
+                        ))}
                     </div>
-                    <div className="flex flex-col">
-                        <span className="text-lg md:text-xl font-bold tracking-tighter text-[var(--foreground)] dark:text-white leading-none">VIKTOR</span>
-                        <span className="text-[10px] font-mono text-[var(--viktor-blue)] tracking-widest leading-none">SYSTEMS</span>
-                    </div>
-                </Link>
-
-                {/* Desktop Links */}
-                <div className="hidden md:flex items-center gap-8">
-                    {links.map((link) => (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            className={cn(
-                                "text-sm font-medium tracking-wide transition-colors relative py-2",
-                                pathname === link.href
-                                    ? "text-[var(--viktor-blue)]"
-                                    : "text-[var(--foreground)] hover:text-[var(--viktor-blue)] dark:text-[var(--viktor-slate)] dark:hover:text-white"
-                            )}
-                        >
-                            {link.label}
-                            {pathname === link.href && (
-                                <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[var(--viktor-blue)] shadow-[0_0_10px_var(--viktor-blue)]" />
-                            )}
-                        </Link>
-                    ))}
-                    <ModeToggle />
                 </div>
 
-                {/* Mobile Menu Button */}
-                <button
-                    className="md:hidden text-[var(--foreground)] dark:text-white"
-                    onClick={() => setIsOpen(!isOpen)}
-                >
-                    {isOpen ? <X /> : <Menu />}
-                </button>
+                <div className="flex items-center gap-2">
+                    <Link href="/teklif">
+                        <Button variant="ghost" size="icon" className="relative">
+                            <ShoppingCart className="h-5 w-5" />
+                            {itemCount > 0 && (
+                                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                                    {itemCount}
+                                </span>
+                            )}
+                        </Button>
+                    </Link>
+                    <ModeToggle />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="md:hidden"
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    >
+                        {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                    </Button>
+                </div>
             </div>
 
             {/* Mobile Menu */}
-            {isOpen && (
-                <div className="md:hidden absolute top-20 left-0 w-full bg-[var(--viktor-bg)] border-b border-[var(--viktor-border)] p-4 flex flex-col gap-4 animate-in slide-in-from-top-5">
-                    {links.map((link) => (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            onClick={() => setIsOpen(false)}
-                            className={cn(
-                                "text-sm font-medium p-2 rounded-sm transition-colors",
-                                pathname === link.href
-                                    ? "bg-[var(--viktor-blue)]/10 text-[var(--viktor-blue)]"
-                                    : "text-[var(--foreground)] hover:text-[var(--viktor-blue)] dark:text-[var(--viktor-slate)] dark:hover:text-white"
-                            )}
-                        >
-                            {link.label}
-                        </Link>
-                    ))}
-                    <div className="flex justify-start px-2 pt-2 border-t border-[var(--viktor-border)]">
-                        <ModeToggle />
+            {isMenuOpen && (
+                <div className="container md:hidden pb-4 pt-2 border-t bg-background">
+                    <div className="flex flex-col gap-4">
+                        {navLinks.map((link) => (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                onClick={() => setIsMenuOpen(false)}
+                                className={cn(
+                                    "text-sm font-medium transition-colors hover:text-primary",
+                                    pathname === link.href ? "text-foreground" : "text-muted-foreground"
+                                )}
+                            >
+                                {link.name}
+                            </Link>
+                        ))}
                     </div>
                 </div>
             )}
         </nav>
-    );
+    )
 }
