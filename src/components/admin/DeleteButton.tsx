@@ -1,40 +1,44 @@
-'use client';
+"use client"
 
-import { Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useFormStatus } from 'react-dom';
+import * as React from "react"
+import { Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface DeleteButtonProps {
-    id: string;
-    action: (id: string) => Promise<{ success: boolean; message: string }>;
+    onDelete: () => Promise<void>
+    label?: string
 }
 
-export function DeleteButton({ id, action }: DeleteButtonProps) {
-    // Wrap to ignore return type for form action compatibility
-    const deleteWithId = async () => {
-        if (confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
-            await action(id);
+export function DeleteButton({ onDelete, label = "Sil" }: DeleteButtonProps) {
+    const [isConfirming, setIsConfirming] = React.useState(false)
+    const [isLoading, setIsLoading] = React.useState(false)
+
+    const handleDelete = async () => {
+        if (!isConfirming) {
+            setIsConfirming(true)
+            setTimeout(() => setIsConfirming(false), 3000)
+            return
         }
-    };
 
-    return (
-        <form action={deleteWithId}>
-            <SubmitButton />
-        </form>
-    );
-}
-
-function SubmitButton() {
-    const { pending } = useFormStatus();
+        setIsLoading(true)
+        try {
+            await onDelete()
+        } finally {
+            setIsLoading(false)
+            setIsConfirming(false)
+        }
+    }
 
     return (
         <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 text-red-500 hover:bg-red-500/10 hover:text-red-400"
-            disabled={pending}
+            variant={isConfirming ? "destructive" : "outline"}
+            size="sm"
+            onClick={handleDelete}
+            disabled={isLoading}
+            className="transition-all"
         >
-            <Trash2 className={`w-4 h-4 ${pending ? 'animate-pulse' : ''}`} />
+            <Trash2 className="h-4 w-4 mr-2" />
+            {isLoading ? "Siliniyor..." : isConfirming ? "Eminim, Sil" : label}
         </Button>
-    );
+    )
 }
