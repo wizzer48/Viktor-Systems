@@ -1,128 +1,71 @@
 import { Brand, Product, ScrapeResult } from './types';
-import { BaseAdapter } from './adapters/base';
 import { InterraAdapter } from './adapters/interra';
 import { EAEAdapter } from './adapters/eae';
 import { GenericFallbackAdapter } from './adapters/generic';
-import { downloadAsset } from './downloader';
-import { normalizeCategory } from './mapper';
-import fs from 'fs/promises';
+import { CategoryMapper } from './mapper';
+import { AssetDownloader } from './downloader';
 import path from 'path';
+import fs from 'fs';
+import slugify from 'slugify';
 import crypto from 'crypto';
 
-const DATA_DIR = path.join(process.cwd(), 'src/data');
-const DATA_FILE = path.join(DATA_DIR, 'products.json');
-
-/** Generate a URL-friendly slug from a product name (Turkish-aware) */
-function slugify(text: string): string {
-    const turkishMap: Record<string, string> = {
-        'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-        'Ç': 'c', 'Ğ': 'g', 'İ': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u',
-    };
-    return text
-        .split('')
-        .map(c => turkishMap[c] || c)
-        .join('')
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')  // Remove non-alphanumeric
-        .replace(/[\s_]+/g, '-')       // Spaces/underscores to hyphens
-        .replace(/-+/g, '-')           // Collapse multiple hyphens
-        .replace(/^-|-$/g, '')         // Trim leading/trailing hyphens
-        .substring(0, 80);             // Max 80 chars
-}
+const DB_PATH = path.join(process.cwd(), 'src/data/products.json');
+const UPLOAD_ROOT = path.join(process.cwd(), 'public/uploads');
 
 export class ScraperEngine {
-    static async scrape(url: string, brand: Brand, headers?: Record<string, string>, cookies?: any[], categoryOverride?: string, subCategoryOverride?: string): Promise<ScrapeResult> {
-        console.log(`\n🚀 BAŞLATILIYOR: ${brand} - ${url}`);
-        const result: ScrapeResult = { success: false, message: '' };
+    static async scrape(
+        url: string,
+        brand: Brand,
+        headers?: Record<string, string>,
+        cookies?: any[],
+        categoryOverride?: string,
+        subCategoryOverride?: string
+    ): Promise<ScrapeResult> {
+        const result: ScrapeResult = { success: false, message: '', data: null };
 
         try {
             // 1. Select Adapter
-            let adapter: BaseAdapter;
+            let adapter;
             const options = { url, brand, headers, cookies };
-            switch (brand) {
-                case 'Interra':
-                    adapter = new InterraAdapter(options);
-                    break;
-                case 'EAE':
-                    adapter = new EAEAdapter(options);
-                    break;
-                default:
-                    adapter = new GenericFallbackAdapter(options);
+
+            if (brand === 'Interra' || url.includes('interratechnology.com')) {
+                adapter = new InterraAdapter(options);
+            } else if (brand === 'EAE' || url.includes('eaetechnology.com')) {
+                adapter = new EAEAdapter(options);
+            } else {
+                adapter = new GenericFallbackAdapter(options);
             }
 
-            // 2. Fetch & Extract Raw Data
-            console.log(`📡 Bağlantı kuruluyor...`);
+            // 2. Fetch & Scrape Raw
+            console.log(`🔍 Starting Scrape for: ${url} [Brand: ${brand}]`);
             await adapter.fetch();
-            console.log(`✅ Bağlantı başarılı. Veri ayıklanıyor...`);
-
             const rawData = await adapter.scrapeRaw();
-            console.log(`🔍 HAM VERİ BULUNDU:`, rawData);
 
-            if (!rawData.title) {
-                throw new Error("Ürün başlığı bulunamadı! Seçiciler (Selectors) hatalı olabilir.");
+            if (!rawData.title || rawData.title === 'No Title') {
+                throw new Error('Ürün başlığı bulunamadı. Sayfa yüklenememiş olabilir.');
             }
 
-            // 3. Asset Management (Download)
-            // Resolve relative URLs
-            let finalImageUrl = rawData.rawImageUrl;
-            if (finalImageUrl && !finalImageUrl.startsWith('http')) {
-                try {
-                    const baseUrl = new URL(url).origin;
-                    finalImageUrl = new URL(finalImageUrl, baseUrl).toString();
-                } catch {
-                    console.warn(`⚠️ Geçersiz Resim URL: ${finalImageUrl}`);
-                }
-            }
+            // 3. Category Mapping
+            const normalizedCategory = categoryOverride || CategoryMapper.map(rawData.originalCategory || 'General');
 
-            let finalPdfUrl = rawData.rawPdfUrl;
-            if (finalPdfUrl && !finalPdfUrl.startsWith('http')) {
-                try {
-                    const baseUrl = new URL(url).origin;
-                    finalPdfUrl = new URL(finalPdfUrl, baseUrl).toString();
-                } catch {
-                    console.warn(`⚠️ Geçersiz PDF URL: ${finalPdfUrl}`);
-                }
-            }
+            // 4. Asset Download (Images & PDFs)
+            const productDir = path.join(UPLOAD_ROOT, 'products');
+            const docDir = path.join(UPLOAD_ROOT, 'docs');
 
-            // Sadece URL varsa indirmeyi dene
-            let imagePath = '/placeholder.svg';
-            if (finalImageUrl) {
-                console.log(`⬇️ Resim indiriliyor: ${finalImageUrl}`);
-                const downloaded = await downloadAsset(finalImageUrl, 'image');
-                if (downloaded) imagePath = downloaded;
-            }
+            // Main Image
+            const imagePath = await AssetDownloader.downloadImage(rawData.rawImageUrl || '', productDir);
 
-            // Download Gallery Images
+            // Gallery
             const galleryPaths: string[] = [];
             if (rawData.rawImages && rawData.rawImages.length > 0) {
-                console.log(`⬇️ Galeri indiriliyor (${rawData.rawImages.length} adet)...`);
                 for (const imgUrl of rawData.rawImages) {
-                    let validUrl = imgUrl;
-                    if (validUrl && !validUrl.startsWith('http')) {
-                        try {
-                            const baseUrl = new URL(url).origin;
-                            validUrl = new URL(validUrl, baseUrl).toString();
-                        } catch {
-                            continue;
-                        }
-                    }
-                    if (validUrl) {
-                        const downloaded = await downloadAsset(validUrl, 'image');
-                        if (downloaded) galleryPaths.push(downloaded);
-                    }
+                    const localImg = await AssetDownloader.downloadImage(imgUrl, productDir);
+                    if (localImg) galleryPaths.push(localImg);
                 }
             }
 
-            let datasheetPath: string | undefined = undefined;
-            if (finalPdfUrl) {
-                console.log(`⬇️ PDF indiriliyor: ${finalPdfUrl}`);
-                const downloaded = await downloadAsset(finalPdfUrl, 'pdf');
-                if (downloaded) datasheetPath = downloaded;
-            }
-
-            // 4. Category Mapping
-            const normalizedCategory = categoryOverride || normalizeCategory(brand, rawData.originalCategory);
-            console.log(`🏷️ Kategori: ${categoryOverride ? `[OVERRIDE] ${categoryOverride}` : `${rawData.originalCategory} -> ${normalizedCategory}`}`);
+            // PDF Datasheet
+            const datasheetPath = await AssetDownloader.downloadPdf(rawData.rawPdfUrl || '', docDir);
 
             // 5. Construct Final Product
             const slug = slugify(rawData.title);
@@ -143,7 +86,7 @@ export class ScraperEngine {
                 subCategory: subCategoryOverride,
                 originalCategory: rawData.originalCategory,
                 description: cleanedDescription,
-                imagePath: imagePath,
+                imagePath: imagePath || '/placeholder.jpg',
                 images: galleryPaths,
                 datasheetPath: datasheetPath,
                 sourceUrl: url,
@@ -167,36 +110,25 @@ export class ScraperEngine {
     }
 
     private static async saveProduct(product: Product) {
-        try {
-            // Klasör var mı kontrol et, yoksa oluştur
-            await fs.mkdir(DATA_DIR, { recursive: true });
+        let products: Product[] = [];
 
+        if (fs.existsSync(DB_PATH)) {
+            const content = fs.readFileSync(DB_PATH, 'utf-8');
             try {
-                await fs.access(DATA_FILE);
-            } catch {
-                await fs.writeFile(DATA_FILE, '[]', 'utf-8');
-            }
-
-            const fileContent = await fs.readFile(DATA_FILE, 'utf-8');
-            let products: Product[] = [];
-            try {
-                products = JSON.parse(fileContent);
-            } catch {
+                products = JSON.parse(content);
+            } catch (e) {
                 products = [];
             }
-
-            const existingIndex = products.findIndex(p => p.sourceUrl === product.sourceUrl);
-            if (existingIndex > -1) {
-                const id = products[existingIndex].id;
-                products[existingIndex] = { ...products[existingIndex], ...product, id, lastUpdated: new Date().toISOString() };
-            } else {
-                products.push(product);
-            }
-
-            await fs.writeFile(DATA_FILE, JSON.stringify(products, null, 2), 'utf-8');
-        } catch (err) {
-            console.error('Veritabanı kayıt hatası:', err);
-            throw new Error('Database save failed');
         }
+
+        // Upsert by ID
+        const index = products.findIndex(p => p.id === product.id);
+        if (index > -1) {
+            products[index] = product;
+        } else {
+            products.push(product);
+        }
+
+        fs.writeFileSync(DB_PATH, JSON.stringify(products, null, 2));
     }
 }
