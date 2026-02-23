@@ -1,37 +1,29 @@
-'use server';
+'use strict';
 
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+Object.defineProperty(exports, '__esModule', { value: true });
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'viktor2026'; // Default fallback, should be ENV
-const COOKIE_NAME = 'viktor_admin_session';
+var cookies = require('next/headers');
 
-export async function login(prevState: { success: boolean; message: string; }, formData: FormData) {
-    const password = formData.get('password') as string;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'viktor123';
 
+async function login(password) {
     if (password === ADMIN_PASSWORD) {
-        // Set secure cookie
-        const cookieStore = await cookies();
-        cookieStore.set(COOKIE_NAME, 'true', {
+        cookies.cookies().set('viktor_admin_session', 'true', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            maxAge: 60 * 60 * 24 * 7, // 1 Week
+            sameSite: 'strict',
+            maxAge: 60 * 60 * 24, // 24 hours
             path: '/',
         });
-
-        return { success: true, message: 'Login successful' };
-    } else {
-        return { success: false, message: 'Invalid password' };
+        return { success: true };
     }
+    return { success: false, message: 'Geçersiz şifre' };
 }
 
-export async function logout() {
-    const cookieStore = await cookies();
-    cookieStore.delete(COOKIE_NAME);
-    redirect('/login');
+async function logout() {
+    cookies.cookies().delete('viktor_admin_session');
+    return { success: true };
 }
 
-export async function checkAuth() {
-    const cookieStore = await cookies();
-    return cookieStore.has(COOKIE_NAME);
-}
+exports.login = login;
+exports.logout = logout;
