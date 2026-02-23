@@ -1,150 +1,72 @@
-'use client';
+"use client"
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import {
-    LogOut,
-    Home,
-    LayoutDashboard,
-    PlusCircle,
-    Bot,
-    FileText,
-    ChevronLeft,
-    ChevronRight,
-    ImageIcon,
-    FolderOpen,
-    Package,
-    Layers,
-} from 'lucide-react';
-import { useState } from 'react';
-import { logout } from '@/app/actions/auth';
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { 
+    LayoutDashboard, 
+    Package, 
+    FolderKanban, 
+    FileText, 
+    Settings,
+    Globe,
+    LogOut
+} from "lucide-react"
 
-const navSections = [
-    {
-        label: 'Genel',
-        items: [
-            { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-            { href: '/admin/teklifler', label: 'Teklifler', icon: FileText },
-        ],
-    },
-    {
-        label: 'Ürün Yönetimi',
-        items: [
-            { href: '/admin/urunler', label: 'Ürünler', icon: Package },
-            { href: '/admin/ekle', label: 'Ürün Ekle', icon: PlusCircle },
-            { href: '/admin/importer', label: 'AI Importer', icon: Bot },
-            { href: '/admin/importer/toplu', label: 'Toplu Import', icon: Layers },
-        ],
-    },
-    {
-        label: 'İçerik',
-        items: [
-            { href: '/admin/referanslar', label: 'Referanslar', icon: ImageIcon },
-            { href: '/admin/referanslar/ekle', label: 'Referans Ekle', icon: FolderOpen },
-        ],
-    },
-];
+import { cn } from "@/lib/utils"
+import { logout } from "@/app/actions/auth"
 
-export default function AdminSidebar() {
-    const pathname = usePathname();
-    const [collapsed, setCollapsed] = useState(false);
+const menuItems = [
+    { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { name: "Ürün Yönetimi", href: "/admin/urunler", icon: Package },
+    { name: "Proje Yönetimi", href: "/admin/projeler", icon: FolderKanban },
+    { name: "Teklif Talepleri", href: "/admin/teklifler", icon: FileText },
+    { name: "Toplu İşlemler", href: "/admin/toplu", icon: Settings },
+]
 
-    const isActive = (href: string) => {
-        if (href === '/admin') return pathname === '/admin';
-        return pathname.startsWith(href);
-    };
+export function AdminSidebar() {
+    const pathname = usePathname()
 
     return (
-        <aside
-            className={`sticky top-0 h-screen flex flex-col bg-[var(--viktor-surface)] border-r border-[var(--viktor-border)] transition-all duration-300 flex-shrink-0 ${collapsed ? 'w-[72px]' : 'w-64'
-                }`}
-        >
-            {/* Brand Header */}
-            <div className="h-16 flex items-center border-b border-[var(--viktor-border)] px-4 gap-3 flex-shrink-0">
-                <div className="w-8 h-8 rounded-lg bg-[var(--viktor-blue)] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                    V
-                </div>
-                {!collapsed && (
-                    <div className="overflow-hidden">
-                        <p className="font-mono text-xs tracking-widest text-[var(--viktor-blue)] font-bold leading-none">
-                            VIKTOR
-                        </p>
-                        <p className="font-mono text-[10px] text-[var(--viktor-slate)] tracking-wider leading-tight mt-0.5">
-                            Admin Console
-                        </p>
-                    </div>
-                )}
+        <aside className="w-64 border-r bg-slate-950 text-slate-200 flex flex-col h-screen sticky top-0">
+            <div className="p-6 border-b border-slate-800">
+                <h1 className="text-xl font-bold tracking-tighter text-cyan-400">VIKTOR ADMIN</h1>
             </div>
-
-            {/* Navigation Sections */}
-            <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
-                {navSections.map((section) => (
-                    <div key={section.label}>
-                        {!collapsed && (
-                            <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--viktor-slate)] mb-2 px-3">
-                                {section.label}
-                            </p>
+            
+            <nav className="flex-1 p-4 space-y-2">
+                {menuItems.map((item) => (
+                    <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                            "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                            pathname === item.href 
+                                ? "bg-cyan-500/10 text-cyan-400 font-medium" 
+                                : "hover:bg-slate-900 text-slate-400 hover:text-slate-100"
                         )}
-                        <div className="space-y-1">
-                            {section.items.map((item) => {
-                                const Icon = item.icon;
-                                const active = isActive(item.href);
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        title={collapsed ? item.label : undefined}
-                                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${active
-                                            ? 'bg-[var(--viktor-blue)]/10 text-[var(--viktor-blue)] border border-[var(--viktor-blue)]/20'
-                                            : 'text-[var(--viktor-slate)] hover:text-foreground hover:bg-[var(--viktor-bg)] border border-transparent'
-                                            }`}
-                                    >
-                                        <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-[var(--viktor-blue)]' : ''}`} />
-                                        {!collapsed && <span>{item.label}</span>}
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    >
+                        <item.icon className="h-5 w-5" />
+                        {item.name}
+                    </Link>
                 ))}
             </nav>
 
-            {/* Sidebar Footer */}
-            <div className="border-t border-[var(--viktor-border)] p-3 space-y-1 flex-shrink-0">
+            <div className="p-4 border-t border-slate-800 space-y-2">
                 <Link
                     href="/"
-                    title={collapsed ? 'Siteye Git' : undefined}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--viktor-slate)] hover:text-foreground hover:bg-[var(--viktor-bg)] transition-all"
+                    target="_blank"
+                    className="flex items-center gap-3 px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-slate-100 transition-colors"
                 >
-                    <Home className="w-5 h-5 flex-shrink-0" />
-                    {!collapsed && <span>Siteye Git</span>}
+                    <Globe className="h-5 w-5" />
+                    Siteye Git
                 </Link>
-                <form action={logout}>
-                    <button
-                        type="submit"
-                        title={collapsed ? 'Çıkış Yap' : undefined}
-                        className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
-                    >
-                        <LogOut className="w-5 h-5 flex-shrink-0" />
-                        {!collapsed && <span>Çıkış Yap</span>}
-                    </button>
-                </form>
-
-                {/* Collapse Toggle */}
                 <button
-                    onClick={() => setCollapsed(!collapsed)}
-                    className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-xs text-[var(--viktor-slate)] hover:text-foreground hover:bg-[var(--viktor-bg)] transition-all mt-2"
+                    onClick={() => logout()}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
                 >
-                    {collapsed ? (
-                        <ChevronRight className="w-4 h-4 flex-shrink-0 mx-auto" />
-                    ) : (
-                        <>
-                            <ChevronLeft className="w-4 h-4 flex-shrink-0" />
-                            <span>Daralt</span>
-                        </>
-                    )}
+                    <LogOut className="h-5 w-5" />
+                    Çıkış Yap
                 </button>
             </div>
         </aside>
-    );
+    )
 }
