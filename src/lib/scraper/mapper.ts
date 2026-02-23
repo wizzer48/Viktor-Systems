@@ -1,41 +1,31 @@
-import categoryMap from '@/data/category-map.json';
-import { Brand } from './types';
+import categoryMap from '../../data/category-map.json';
 
-// Define the structure of the JSON file for type safety
-interface CategoryMap {
-    GlobalRules: Record<string, string[]>;
-    BrandSpecific: Record<string, Record<string, string>>;
-}
+export class CategoryMapper {
+    /**
+     * Maps a raw category string from the manufacturer to our normalized internal categories.
+     * @param rawCategory The category string found on the manufacturer page.
+     */
+    static map(rawCategory: string): string {
+        if (!rawCategory) return 'Diğer';
 
-const mapData = categoryMap as CategoryMap;
+        const normalized = rawCategory.toLowerCase().trim();
 
-export function normalizeCategory(brand: Brand, originalCategory: string): string {
-    if (!originalCategory) return "Ev Çözümleri";
-
-    // 1. Check Brand Specific Rules first (High Priority)
-    if (mapData.BrandSpecific[brand]) {
-        const brandRules = mapData.BrandSpecific[brand];
-        // Exact match check
-        if (brandRules[originalCategory]) {
-            return brandRules[originalCategory];
-        }
-        // Partial match check
-        for (const [key, value] of Object.entries(brandRules)) {
-            if (originalCategory.toLowerCase().includes(key.toLowerCase())) {
-                return value;
+        // 1. Direct match in mapping file
+        for (const [internalCategory, synonyms] of Object.entries(categoryMap)) {
+            if (Array.isArray(synonyms)) {
+                if (synonyms.some(s => normalized.includes(s.toLowerCase()))) {
+                    return internalCategory;
+                }
             }
         }
-    }
 
-    // 2. Check Global Rules (Keyword based)
-    for (const [targetCategory, keywords] of Object.entries(mapData.GlobalRules)) {
-        for (const keyword of keywords) {
-            if (originalCategory.toLowerCase().includes(keyword.toLowerCase())) {
-                return targetCategory;
-            }
-        }
-    }
+        // 2. Keyword based extraction
+        if (normalized.includes('touch') || normalized.includes('panel') || normalized.includes('ekran')) return 'Dokunmatik Paneller';
+        if (normalized.includes('actuator') || normalized.includes('aktuator')) return 'Aktüatörler';
+        if (normalized.includes('sensor') || normalized.includes('detector')) return 'Sensörler';
+        if (normalized.includes('gateway') || normalized.includes('interface')) return 'Gateway & Arayüzler';
+        if (normalized.includes('power') || normalized.includes('supply')) return 'Güç Kaynakları';
 
-    // 3. Fallback
-    return "Ev Çözümleri";
+        return 'Genel';
+    }
 }
