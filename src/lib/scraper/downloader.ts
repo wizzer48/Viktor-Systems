@@ -1,48 +1,91 @@
-import fs from 'fs/promises';
+import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 import crypto from 'crypto';
 
-export async function downloadAsset(url: string, type: 'image' | 'pdf'): Promise<string | null> {
-    if (!url) return null;
+export class AssetDownloader {
+    static async downloadImage(url: string, targetDir: string): Promise<string | null> {
+        try {
+            if (!url) return null;
 
-    try {
-        const origin = new URL(url).origin;
-
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept': type === 'image' ? 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' : 'application/pdf',
-                'Referer': origin
+            // Ensure directory exists
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true });
             }
-        });
 
-        if (!response.ok) {
-            console.warn(`Failed to download asset (${response.status}): ${url}`);
+            // Generate unique filename based on URL hash
+            const hash = crypto.createHash('md5').update(url).digest('hex');
+            const ext = path.extname(new URL(url).pathname) || '.jpg';
+            const filename = `${hash}${ext}`;
+            const targetPath = path.join(targetDir, filename);
+
+            // Relative path for database
+            const publicPath = `/uploads/products/${filename}`;
+
+            // Check if already exists
+            if (fs.existsSync(targetPath)) return publicPath;
+
+            console.log(`📥 Downloading Image: ${url}`);
+            const response = await axios({
+                url,
+                method: 'GET',
+                responseType: 'stream',
+                timeout: 10000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+
+            const writer = fs.createWriteStream(targetPath);
+            response.data.pipe(writer);
+
+            return new Promise((resolve, reject) => {
+                writer.on('finish', () => resolve(publicPath));
+                writer.on('error', reject);
+            });
+
+        } catch (error) {
+            console.error(`❌ Image download failed: ${url}`, error instanceof Error ? error.message : error);
             return null;
         }
+    }
 
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+    static async downloadPdf(url: string, targetDir: string): Promise<string | null> {
+        try {
+            if (!url) return null;
 
-        let fileExtension = path.extname(new URL(url).pathname);
-        if (!fileExtension) {
-            fileExtension = type === 'image' ? '.jpg' : '.pdf';
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true });
+            }
+
+            const fileName = path.basename(new URL(url).pathname);
+            const targetPath = path.join(targetDir, fileName);
+            const publicPath = `/uploads/docs/${fileName}`;
+
+            if (fs.existsSync(targetPath)) return publicPath;
+
+            console.log(`📥 Downloading PDF: ${url}`);
+            const response = await axios({
+                url,
+                method: 'GET',
+                responseType: 'stream',
+                timeout: 20000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+
+            const writer = fs.createWriteStream(targetPath);
+            response.data.pipe(writer);
+
+            return new Promise((resolve, reject) => {
+                writer.on('finish', () => resolve(publicPath));
+                writer.on('error', reject);
+            });
+
+        } catch (error) {
+            console.error(`❌ PDF download failed: ${url}`, error instanceof Error ? error.message : error);
+            return null;
         }
-
-        const fileName = `${crypto.randomUUID()}${fileExtension}`;
-        const folder = type === 'image' ? 'products' : 'docs';
-        const uploadDir = path.join(process.cwd(), 'public', 'uploads', folder);
-
-        await fs.mkdir(uploadDir, { recursive: true });
-
-        const absolutePath = path.join(uploadDir, fileName);
-        await fs.writeFile(absolutePath, buffer);
-
-        // Correct Return Path for Web (No /public)
-        return `/uploads/${folder}/${fileName}`;
-
-    } catch (error) {
-        console.error(`Error downloading asset from ${url}:`, error);
-        return null;
     }
 }
